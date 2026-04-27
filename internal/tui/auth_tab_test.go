@@ -72,3 +72,32 @@ func TestAuthTabRenderContentShowsCodexQuotaSummaryInRows(t *testing.T) {
 		}
 	}
 }
+
+func TestAuthTabRenderContentShowsCodexQuotaSummaryForDisabledRows(t *testing.T) {
+	m := authTabModel{
+		width: 120,
+		files: []map[string]any{
+			{
+				"name":                "codex-disabled.json",
+				"type":                "codex",
+				"email":               "disabled@example.com",
+				"disabled":            true,
+				"plan_type":           "pro",
+				"quota_5h_amount":     "42 / 100 remaining",
+				"quota_weekly_amount": "900 / 1000 remaining",
+			},
+		},
+	}
+
+	out := m.renderContent()
+	for _, want := range []string{
+		"disabled",
+		"Pro",
+		"5h:42/100",
+		"wk:900/1000",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("renderContent() missing %q in:\n%s", want, out)
+		}
+	}
+}

@@ -1,6 +1,8 @@
 package management
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -114,5 +116,47 @@ func TestBuildAuthFileEntry_PreservesCooldownWhenQuotaWindowMetadataIsPartial(t 
 	}
 	if got, ok := entry["quota_5h_recover_in"].(string); !ok || got == "" {
 		t.Fatalf("quota_5h_recover_in = %#v, want non-empty string", entry["quota_5h_recover_in"])
+	}
+}
+
+func TestBuildAuthFileEntry_ExposesCodexQuotaForDisabledAuth(t *testing.T) {
+	authPath := filepath.Join(t.TempDir(), "codex-disabled.json")
+	if err := os.WriteFile(authPath, []byte(`{"type":"codex"}`), 0o600); err != nil {
+		t.Fatalf("failed to write auth file: %v", err)
+	}
+
+	auth := &coreauth.Auth{
+		ID:       "codex-disabled.json",
+		FileName: "codex-disabled.json",
+		Provider: "codex",
+		Disabled: true,
+		Status:   coreauth.StatusDisabled,
+		Attributes: map[string]string{
+			"path":      authPath,
+			"plan_type": "plus",
+		},
+		Metadata: map[string]any{
+			"codex_quota_5h_limit":         float64(100),
+			"codex_quota_5h_remaining":     float64(42),
+			"codex_quota_weekly_limit":     float64(1000),
+			"codex_quota_weekly_remaining": float64(900),
+		},
+	}
+
+	entry := (&Handler{}).buildAuthFileEntry(auth)
+	if entry == nil {
+		t.Fatal("expected disabled auth entry to remain visible")
+	}
+	if got := entry["disabled"]; got != true {
+		t.Fatalf("disabled = %#v, want true", got)
+	}
+	if got := entry["plan_type"]; got != "plus" {
+		t.Fatalf("plan_type = %#v, want %q", got, "plus")
+	}
+	if got := entry["quota_5h_amount"]; got != "42 / 100 remaining" {
+		t.Fatalf("quota_5h_amount = %#v, want %q", got, "42 / 100 remaining")
+	}
+	if got := entry["quota_weekly_amount"]; got != "900 / 1000 remaining" {
+		t.Fatalf("quota_weekly_amount = %#v, want %q", got, "900 / 1000 remaining")
 	}
 }
